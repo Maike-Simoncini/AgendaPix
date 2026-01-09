@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda Pix</title>
+    <!-- Carrega o Tailwind CSS para um visual moderno e responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary': '#2563eb', // Azul forte
+                        'secondary': '#f97316', // Laranja
+                        'success': '#10b981', // Verde
+                        'warning': '#facc15', // Amarelo
+                        'danger': '#ef4444', // Vermelho
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Estilos CSS customizados para garantir a responsividade e a fonte */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+        /* Estilo para a notificação */
+        #copy-message {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.5s, top 0.5s;
+        }
+        #copy-message.show {
+            opacity: 1;
+            top: 30px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="container w-full max-w-2xl mx-auto bg-white p-6 md:p-8 rounded-xl shadow-2xl space-y-6">
+        <h2 class="text-3xl font-extrabold text-center text-primary">
+            🏦 Agenda Pix
+        </h2>
+        <p class="text-center text-gray-500">
+            Cadastre e gerencie suas chaves Pix.
+        </p>
+
+        <!-- Formulário para Adicionar / Editar -->
+        <form id="pix-form" class="flex flex-col gap-4 bg-gray-50 p-4 rounded-lg shadow-inner">
+            <input type="text" id="nome-input" placeholder="Nome (Ex: Ana Silva)" required
+                class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition duration-150">
+            <input type="text" id="chave-input" placeholder="Chave Pix (CPF, email, telefone...)" required
+                class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition duration-150">
+            
+            <button type="submit" class="w-full py-3 bg-success hover:bg-green-600 text-white font-bold rounded-lg shadow-md transition duration-200" id="submit-btn">
+                <span class="flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Salvar Pix
+                </span>
+            </button>
+            <input type="hidden" id="edit-index">
+        </form>
+
+        <!-- Lista de Chaves Pix -->
+        <div id="pix-list" class="space-y-3">
+            <!-- Os itens serão inseridos aqui pelo JavaScript -->
+        </div>
+
+        <p class="text-center text-xs text-gray-400 pt-4 border-t border-gray-200">
+            *As chaves Pix são salvas apenas no seu navegador.
+        </p>
+
+    </div>
+
+    <!-- Mensagem de notificação flutuante -->
+    <div id="copy-message" class="bg-success text-white px-4 py-2 rounded-lg shadow-xl">Copiado!</div>
+
+    <script>
+        // Variável que armazena a lista de Pix
+        let pixList = [];
+        const STORAGE_KEY = 'pixFamiliaData';
+
+        // Elementos DOM
+        const nomeInput = document.getElementById('nome-input');
+        const chaveInput = document.getElementById('chave-input');
+        const editIndexInput = document.getElementById('edit-index');
+        const submitBtn = document.getElementById('submit-btn');
+        const listContainer = document.getElementById('pix-list');
+        const copyMessage = document.getElementById('copy-message');
+
+        // --- Funções de Salvar/Carregar (LocalStorage) ---
+
+        function carregarDados() {
+            const data = localStorage.getItem(STORAGE_KEY);
+            if (data) {
+                try {
+                    pixList = JSON.parse(data);
+                } catch (e) {
+                    console.error("Erro ao carregar dados do localStorage:", e);
+                    pixList = [];
+                }
+            }
+            renderizarLista();
+        }
+
+        function salvarDados() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(pixList));
+        }
+
+        // --- Funções de Notificação ---
+
+        function mostrarNotificacao(mensagem, type = 'success') {
+            copyMessage.textContent = mensagem;
+            copyMessage.className = `fixed top-20 left-1/2 -translate-x-1/2 z-1000 px-4 py-2 rounded-lg shadow-xl text-white transition duration-500 ${type === 'success' ? 'bg-success' : 'bg-danger'} opacity-0`;
+            
+            // Força a classe 'show' após um pequeno delay para a transição funcionar
+            setTimeout(() => {
+                copyMessage.classList.add('show');
+            }, 10);
+            
+            // Remove a notificação após 3 segundos
+            setTimeout(() => {
+                copyMessage.classList.remove('show');
+            }, 2500);
+        }
+
+        // --- Funções de Renderização e Ação ---
+
+        function renderizarLista() {
+            listContainer.innerHTML = ''; // Limpa a lista
+
+            if (pixList.length === 0) {
+                listContainer.innerHTML = '<p class="text-center text-gray-500 p-5 bg-gray-100 rounded-lg">Nenhuma chave Pix cadastrada. Comece a adicionar!</p>';
+                return;
+            }
+
+            // Garante que a lista seja renderizada do mais novo para o mais antigo, mas pode ser mudado
+            pixList.slice().reverse().forEach((item, indexOriginal) => {
+                // Ajusta o índice para ser o correto na lista pixList (se a lista foi invertida)
+                const index = pixList.length - 1 - indexOriginal;
+                
+                const pixItem = document.createElement('div');
+                pixItem.className = 'pix-item flex flex-col md:flex-row items-start md:items-center justify-between bg-white p-4 rounded-lg shadow-md border-l-4 border-primary';
+                
+                pixItem.innerHTML = `
+                    <div class="pix-info flex-1 w-full md:w-auto overflow-hidden">
+                        <strong class="text-lg font-semibold text-gray-800">${item.nome}</strong>
+                        <span class="block text-primary font-mono truncate hover:overflow-visible hover:whitespace-normal transition-all duration-300" title="Clique para copiar">${item.chave}</span>
+                    </div>
+                    <div class="action-btns flex gap-2 mt-3 md:mt-0 w-full md:w-auto">
+                        <button class="copy-btn flex-1 py-2 px-3 bg-primary hover:bg-blue-700 text-white rounded-lg transition duration-200" onclick="copiarPix(${index})" title="Copiar Chave Pix">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copiar
+                        </button>
+                        <button class="edit-btn py-2 px-3 bg-warning hover:bg-yellow-600 text-gray-900 rounded-lg transition duration-200" onclick="prepararEdicao(${index})" title="Editar Chave Pix">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                        </button>
+                        <button class="delete-btn py-2 px-3 bg-danger hover:bg-red-600 text-white rounded-lg transition duration-200" onclick="excluirPix(${index})" title="Apagar Chave Pix">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+                `;
+                listContainer.appendChild(pixItem);
+            });
+        }
+
+        function adicionarOuAtualizarPix(event) {
+            event.preventDefault();
+
+            const nome = nomeInput.value.trim();
+            const chave = chaveInput.value.trim();
+            const index = editIndexInput.value;
+
+            if (nome === "" || chave === "") {
+                mostrarNotificacao("Preencha todos os campos!", 'danger');
+                return;
+            }
+
+            if (index !== "") {
+                // Modo Edição
+                pixList[index].nome = nome;
+                pixList[index].chave = chave;
+                // Reseta o formulário
+                editIndexInput.value = "";
+                submitBtn.innerHTML = '<span class="flex items-center justify-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Adicionar Pix</span>';
+                submitBtn.classList.replace('bg-primary', 'bg-success');
+                submitBtn.classList.replace('hover:bg-blue-700', 'hover:bg-green-600');
+                mostrarNotificacao(`Pix de ${nome} editado com sucesso.`);
+            } else {
+                // Modo Adicionar
+                pixList.push({ nome: nome, chave: chave });
+                mostrarNotificacao(`Pix de ${nome} adicionado!`);
+            }
+
+            salvarDados();
+            renderizarLista();
+            nomeInput.value = '';
+            chaveInput.value = '';
+        }
+
+        function prepararEdicao(index) {
+            const item = pixList[index];
+            nomeInput.value = item.nome;
+            chaveInput.value = item.chave;
+            editIndexInput.value = index;
+            submitBtn.innerHTML = '<span class="flex items-center justify-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Salvar Edição</span>';
+            submitBtn.classList.replace('bg-success', 'bg-primary');
+            submitBtn.classList.replace('hover:bg-green-600', 'hover:bg-blue-700');
+            nomeInput.focus();
+            mostrarNotificacao(`Editando Pix de ${item.nome}`, 'warning');
+        }
+
+        function excluirPix(index) {
+            const nome = pixList[index].nome;
+            // Usando o confirm nativo com aviso de que é apenas um esboço
+            if (window.confirm(`Tem certeza que deseja APAGAR o Pix de ${nome}? (Clique em OK para confirmar)`)) {
+                pixList.splice(index, 1);
+                salvarDados();
+                renderizarLista();
+                mostrarNotificacao(`Pix de ${nome} apagado.`, 'danger');
+            }
+        }
+
+        function copiarPix(index) {
+            const chaveParaCopiar = pixList[index].chave;
+            
+            // Tenta usar a API Clipboard (moderna)
+            navigator.clipboard.writeText(chaveParaCopiar)
+                .then(() => {
+                    mostrarNotificacao(`Chave copiada: ${chaveParaCopiar}`);
+                })
+                .catch(err => {
+                    // Fallback para navegadores mais antigos (usando execCommand)
+                    const tempInput = document.createElement('textarea');
+                    tempInput.value = chaveParaCopiar;
+                    document.body.appendChild(tempInput);
+                    tempInput.select();
+                    try {
+                        document.execCommand('copy');
+                        mostrarNotificacao(`Chave copiada (Fallback): ${chaveParaCopiar}`);
+                    } catch (err) {
+                        mostrarNotificacao("Falha ao copiar. Selecione e copie manualmente.", 'danger');
+                        console.error('Erro de fallback ao copiar:', err);
+                    }
+                    document.body.removeChild(tempInput);
+                });
+        }
+        
+        // --- Inicialização ---
+        document.getElementById('pix-form').addEventListener('submit', adicionarOuAtualizarPix);
+        carregarDados();
+    </script>
+</body>
+</html>
