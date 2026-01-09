@@ -24,7 +24,7 @@ Uma aplicação web leve, moderna e intuitiva para gerenciar suas chaves Pix fav
 
 1.  **Clone o repositório:**
     ```bash
-    git clone [https://github.com/Maike-Simoncini/AgendaPix.git](https://github.com/Maike-Simoncini/AgendaPix.git)
+    https://github.com/Maike-Simoncini/AgendaPix.git
     ```
 2.  **Abra o arquivo:**
     Navegue até a pasta do projeto e abra o arquivo `index.html` em qualquer navegador (Chrome, Edge, Firefox, Safari).
